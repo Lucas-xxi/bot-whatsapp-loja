@@ -1,9 +1,10 @@
 # Usa imagem oficial Node
 FROM node:18-slim
 
-# Instala dependências de sistema necessárias para Puppeteer
+# Instala dependências do sistema (incluindo git)
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    git \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -46,17 +47,17 @@ WORKDIR /app
 # Copia package.json e package-lock.json
 COPY package*.json ./
 
-# 🚨 Adiciona variável para pular download do Chromium
+# Pula download do Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Instala dependências
 RUN npm install
 
-# Copia o restante do código
+# Copia todo restante
 COPY . .
 
-# Expõe a porta (ajuste se seu app usar outra porta)
+# Expõe a porta (ajuste se precisar)
 EXPOSE 3000
 
-# Comando para iniciar
+# Inicia
 CMD ["npm", "start"]
