@@ -13,5 +13,8 @@
     "whatsapp-web.js": "^1.23.0",
     "puppeteer": "^22.5.2",
     "qrcode-terminal": "^0.12.0"
+  },
+  "puppeteer": {
+    "default_browser_revision": "120.0.6099.71"
   }
 }
