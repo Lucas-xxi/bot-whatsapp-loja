@@ -1,7 +1,7 @@
-# Usa imagem Node.js oficial
-FROM node:20
+# Usa imagem oficial Node
+FROM node:18-slim
 
-# Instala dependências extras para Puppeteer (Chromium headless)
+# Instala dependências de sistema necessárias para Puppeteer
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     fonts-liberation \
@@ -40,19 +40,22 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Cria diretório app
+# Define diretório de trabalho
 WORKDIR /app
 
-# Copia arquivos
+# Copia package.json e package-lock.json
 COPY package*.json ./
+
+# 🚨 Adiciona variável para pular download do Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Instala dependências
 RUN npm install
 
-# Copia resto do projeto
+# Copia o restante do código
 COPY . .
 
-# Expõe porta (caso use express)
+# Expõe a porta (ajuste se seu app usar outra porta)
 EXPOSE 3000
 
 # Comando para iniciar
