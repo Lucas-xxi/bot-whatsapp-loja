@@ -1,33 +1,43 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
-const fotos = require('./fotos.json');
+const { default: makeWASocket, useSingleFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
+const { Boom } = require("@hapi/boom");
+const { state, saveState } = useSingleFileAuthState("./auth_info.json");
 
-const client = new Client({
-  authStrategy: new LocalAuth()
-});
+async function startSock() {
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: true
+    });
 
-client.on('qr', qr => {
-  qrcode.generate(qr, { small: true });
-});
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === "close") {
+            const shouldReconnect = (lastDisconnect.error = new Boom(lastDisconnect?.error))?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log("Connection closed. Reconnecting: ", shouldReconnect);
+            if (shouldReconnect) {
+                startSock();
+            }
+        } else if (connection === "open") {
+            console.log("✅ Conectado com sucesso!");
+        }
+    });
 
-client.on('ready', () => {
-  console.log('✅ Bot pronto!');
-});
+    sock.ev.on("messages.upsert", async ({ messages, type }) => {
+        if (type === "notify") {
+            const msg = messages[0];
+            if (!msg.message) return;
 
-client.on('message', async msg => {
-  const texto = msg.body.toLowerCase();
+            const sender = msg.key.remoteJid;
+            const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
-  if (texto.includes('corolla')) {
-    const fotosCarro = fotos['corolla2020'];
-    for (const foto of fotosCarro) {
-      await client.sendMessage(msg.from, foto);
-    }
-    client.sendMessage(msg.from, '🚗 Seguem as fotos do Corolla 2020!');
-  } else if (texto.includes('preço')) {
-    client.sendMessage(msg.from, '💰 O Corolla 2020 está por R$ 95.000. Quer agendar uma visita?');
-  } else {
-    client.sendMessage(msg.from, 'Olá! Posso te ajudar com fotos, preços ou agendamento. Me fala o modelo!');
-  }
-});
+            console.log("Mensagem recebida:", text);
 
-client.initialize();
+            if (text === "teste") {
+                await sock.sendMessage(sender, { text: "Funcionando! ✅" });
+            }
+        }
+    });
+
+    sock.ev.on("creds.update", saveState);
+}
+
+startSock();
