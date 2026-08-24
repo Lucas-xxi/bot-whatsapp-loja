@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel WhatsApp — Instâncias</title>
+<style>
+  :root {
+    --bg: #0b1512; --card: #111f1a; --card2: #0e1a15; --line: #1e332b;
+    --text: #e8f5ef; --muted: #8fb0a3; --green: #34d399; --yellow: #fbbf24;
+    --red: #f87171; --blue: #60a5fa; --gray: #9ca3af;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; min-height: 100vh; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  h1 { font-size: 22px; }
+  h1 small { color: var(--muted); font-weight: 400; font-size: 13px; display: block; margin-top: 4px; }
+  .token-box { display: flex; gap: 8px; }
+  input, select, textarea {
+    background: var(--card2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 9px 12px; font-size: 14px; width: 100%;
+  }
+  button {
+    background: var(--green); color: #06281c; border: 0; border-radius: 8px;
+    padding: 9px 14px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  button.sec { background: var(--card2); color: var(--text); border: 1px solid var(--line); }
+  button.danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
+  button:disabled { opacity: .5; cursor: default; }
+  .aviso {
+    background: #2a1215; border: 1px solid #7f1d1d; color: #fecaca;
+    border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.5; margin-bottom: 20px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .card h2 { font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card .meta { color: var(--muted); font-size: 13px; margin: 6px 0 12px; line-height: 1.6; }
+  .badge { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; }
+  .b-conectado { background: #06281c; color: var(--green); border: 1px solid var(--green); }
+  .b-aguardando_qr { background: #2b2109; color: var(--yellow); border: 1px solid var(--yellow); }
+  .b-conectando, .b-reconectando { background: #0d1f33; color: var(--blue); border: 1px solid var(--blue); }
+  .b-parado, .b-qr_expirado { background: #1f2429; color: var(--gray); border: 1px solid var(--gray); }
+  .b-desconectado_logout, .b-erro { background: #2a1215; color: var(--red); border: 1px solid var(--red); }
+  .qr { text-align: center; background: #fff; border-radius: 10px; padding: 10px; margin: 10px 0; }
+  .qr img { width: 100%; max-width: 260px; image-rendering: pixelated; }
+  .qr-dica { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .nova { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 24px; }
+  .nova h2 { font-size: 16px; margin-bottom: 12px; }
+  .nova .campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px; }
+  label.chk { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--muted); line-height: 1.5; margin: 10px 0; cursor: pointer; }
+  label.chk input { width: auto; margin-top: 3px; }
+  .vazio { color: var(--muted); text-align: center; padding: 40px 0; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--line); padding: 10px 18px; border-radius: 10px; font-size: 14px; display: none; max-width: 90vw; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📱 Instâncias WhatsApp <small>Cada número com sua sessão própria e persistente</small></h1>
+    <div class="token-box">
+      <input id="token" type="password" placeholder="Token do painel" style="width:180px">
+      <button class="sec" onclick="salvarToken()">Salvar</button>
+    </div>
+  </header>
+
+  <div class="aviso">
+    <strong>Aviso obrigatório:</strong> ao parear um número por QR, as conversas acessíveis pelo
+    WhatsApp Web podem ser baixadas para o ambiente local do bot. Só conecte números cujo dono
+    autorizou, com finalidade documentada. Gere o QR apenas quando o operador estiver pronto para escanear.
+  </div>
+
+  <div class="nova">
+    <h2>➕ Conectar novo WhatsApp</h2>
+    <div class="campos">
+      <input id="f-nome" placeholder="Nome da instância (ex: Loja Centro)">
+      <input id="f-dono" placeholder="Dono do número (ex: Lucas)">
+      <select id="f-finalidade">
+        <option value="vendas">Vendas</option>
+        <option value="suporte">Suporte</option>
+        <option value="operacao">Operação</option>
+        <option value="pessoal">Pessoal</option>
+        <option value="outro">Outro</option>
+      </select>
+    </div>
+    <label class="chk">
+      <input type="checkbox" id="f-consent">
+      <span>Confirmo que o dono do número autoriza o pareamento e entende que o histórico
+      acessível pelo WhatsApp Web pode ser baixado para o ambiente local deste bot.</span>
+    </label>
+    <label class="chk">
+      <input type="checkbox" id="f-responder" checked>
+      <span>Responder mensagens automaticamente (bot da loja ativo neste número)</span>
+    </label>
+    <button onclick="criar()">Criar instância e gerar QR</button>
+  </div>
+
+  <div id="lista" class="grid"></div>
+  <div id="vazio" class="vazio" style="display:none">Nenhuma instância ainda. Conecte o primeiro WhatsApp acima. 🚀</div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id)
+let carregando = false
+
+function token() { try { return localStorage.getItem('panelToken') || '' } catch { return '' } }
+function salvarToken() {
+  try { localStorage.setItem('panelToken', $('token').value) } catch {}
+  toast('Token salvo.')
+  atualizar()
+}
+function headers() {
+  const h = { 'Content-Type': 'application/json' }
+  const t = token()
+  if (t) h['x-panel-token'] = t
+  return h
+}
+function toast(msg) {
+  const el = $('toast')
+  el.textContent = msg
+  el.style.display = 'block'
+  clearTimeout(el._t)
+  el._t = setTimeout(() => (el.style.display = 'none'), 4000)
+}
+async function api(caminho, opts = {}) {
+  const res = await fetch(caminho, { headers: headers(), ...opts })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.erro || ('Erro ' + res.status))
+  return body
+}
+
+const LABELS = {
+  conectado: 'Conectado', aguardando_qr: 'Aguardando QR', conectando: 'Conectando',
+  reconectando: 'Reconectando', parado: 'Parado', qr_expirado: 'QR expirado',
+  desconectado_logout: 'Desconectado', erro: 'Erro',
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+}
+
+function cardHtml(i) {
+  const podeConectar = ['parado', 'qr_expirado', 'desconectado_logout', 'erro'].includes(i.status)
+  const ativo = ['conectado', 'aguardando_qr', 'conectando', 'reconectando'].includes(i.status)
+  let qr = ''
+  if (i.status === 'aguardando_qr' && i.qrDataUrl) {
+    qr = `<div class="qr"><img src="${i.qrDataUrl}" alt="QR Code"></div>
+          <div class="qr-dica">📲 WhatsApp &gt; Aparelhos conectados &gt; Conectar aparelho</div>`
+  } else if (i.status === 'aguardando_qr') {
+    qr = `<div class="qr-dica">Gerando QR...</div>`
+  }
+  return `<div class="card">
+    <h2>${esc(i.nome)} <span class="badge b-${esc(i.status)}">${LABELS[i.status] || esc(i.status)}</span></h2>
+    <div class="meta">
+      ${i.phone ? '📞 +' + esc(i.phone) + '<br>' : ''}
+      ${i.dono ? '👤 ' + esc(i.dono) + ' · ' : ''}🎯 ${esc(i.finalidade || '-')}<br>
+      💬 ${i.msgCount || 0} msgs nesta sessão${i.lastMessageAt ? ' · última ' + new Date(i.lastMessageAt).toLocaleTimeString('pt-BR') : ''}<br>
+      🤖 Resposta automática: ${i.responderAutomatico === false ? 'desligada' : 'ligada'}
+    </div>
+    ${qr}
+    <div class="acoes">
+      ${podeConectar ? `<button onclick="acao('${esc(i.id)}','start')">Conectar</button>` : ''}
+      ${ativo ? `<button class="sec" onclick="acao('${esc(i.id)}','stop')">Parar</button>` : ''}
+      ${i.status === 'conectado' ? `<button class="sec" onclick="if(confirm('Desconectar o aparelho e apagar a sessão local?'))acao('${esc(i.id)}','logout')">Desparear</button>` : ''}
+      <button class="danger" onclick="remover('${esc(i.id)}')">Remover</button>
+    </div>
+  </div>`
+}
+
+async function atualizar() {
+  if (carregando) return
+  carregando = true
+  try {
+    const { instances } = await api('/api/instances')
+    $('lista').innerHTML = instances.map(cardHtml).join('')
+    $('vazio').style.display = instances.length ? 'none' : 'block'
+  } catch (err) {
+    toast(err.message)
+  } finally {
+    carregando = false
+  }
+}
+
+async function criar() {
+  if (!$('f-consent').checked) {
+    toast('É obrigatório confirmar o consentimento antes de gerar o QR.')
+    return
+  }
+  try {
+    await api('/api/instances', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: $('f-nome').value,
+        dono: $('f-dono').value,
+        finalidade: $('f-finalidade').value,
+        consentimento: true,
+        responderAutomatico: $('f-responder').checked,
+      }),
+    })
+    $('f-nome').value = ''
+    $('f-dono').value = ''
+    $('f-consent').checked = false
+    toast('Instância criada! O QR vai aparecer no cartão em instantes.')
+    atualizar()
+  } catch (err) {
+    toast(err.message)
+  }
+}
+
+async function acao(id, verbo) {
+  try {
+    await api(`/api/instances/${id}/${verbo}`, { method: 'POST' })
+    atualizar()
+  } catch (err) {
+    toast(err.message)
+  }
+}
+
+async function remover(id) {
+  if (!confirm(`Remover a instância "${id}"? A sessão e o histórico local serão apagados.`)) return
+  try {
+    await api(`/api/instances/${id}`, { method: 'DELETE' })
+    atualizar()
+  } catch (err) {
+    toast(err.message)
+  }
+}
+
+$('token').value = token()
+atualizar()
+setInterval(atualizar, 3000)
+</script>
+</body>
+</html>

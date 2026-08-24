@@ -1,47 +1,27 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys')
-const { Boom } = require('@hapi/boom')
-const qrcode = require('qrcode-terminal')
+const { InstanceManager, DATA_DIR } = require('./src/instanceManager')
+const { createApp } = require('./src/webServer')
 
-async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info')
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: true
-    })
+async function main() {
+    console.log('🚀 Bot WhatsApp Loja — multi-instância persistente')
+    console.log(`📂 Dados (sessões e histórico) em: ${DATA_DIR}`)
 
-    sock.ev.on('creds.update', saveCreds)
+    const manager = new InstanceManager()
+    await manager.init()
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update
-        if (qr) {
-            qrcode.generate(qr, { small: true })
-        }
-
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error = new Boom(lastDisconnect?.error))?.output?.statusCode !== DisconnectReason.loggedOut
-            console.log('Conexão fechada. Reconectando:', shouldReconnect)
-            if (shouldReconnect) {
-                startBot()
-            }
-        } else if (connection === 'open') {
-            console.log('✅ Bot conectado com sucesso!')
-        }
-    })
-
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return
-        const msg = messages[0]
-        if (!msg.message) return
-
-        const from = msg.key.remoteJid
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text
-
-        console.log(`Mensagem recebida de ${from}: ${text}`)
-
-        if (text && text.toLowerCase() === 'oi') {
-            await sock.sendMessage(from, { text: 'Oi! 🤖 Estou online.' })
+    const port = process.env.PORT || 3000
+    createApp(manager).listen(port, () => {
+        console.log(`🌐 Painel disponível na porta ${port} (abra a URL do serviço no navegador).`)
+        if (manager.list().length === 0) {
+            console.log('👉 Nenhuma instância ainda. Abra o painel e conecte o primeiro WhatsApp.')
         }
     })
 }
 
-startBot()
+process.on('unhandledRejection', (err) => {
+    console.error('Rejeição não tratada:', err)
+})
+
+main().catch((err) => {
+    console.error('Erro fatal ao iniciar:', err)
+    process.exit(1)
+})
