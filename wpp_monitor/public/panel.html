@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Painel WhatsApp — Instâncias</title>
+<title>WPP Monitor</title>
 <style>
   :root {
     --bg: #0b1512; --card: #111f1a; --card2: #0e1a15; --line: #1e332b;
@@ -13,7 +13,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; min-height: 100vh; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
-  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   h1 { font-size: 22px; }
   h1 small { color: var(--muted); font-weight: 400; font-size: 13px; display: block; margin-top: 4px; }
   .token-box { display: flex; gap: 8px; }
@@ -28,6 +28,21 @@
   button.sec { background: var(--card2); color: var(--text); border: 1px solid var(--line); }
   button.danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
   button:disabled { opacity: .5; cursor: default; }
+
+  .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+  .tab {
+    background: transparent; color: var(--muted); border: 0; border-bottom: 2px solid transparent;
+    border-radius: 0; padding: 10px 16px; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .tab.ativa { color: var(--green); border-bottom-color: var(--green); }
+  .pagina { display: none; }
+  .pagina.ativa { display: block; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .stat b { font-size: 24px; display: block; }
+  .stat span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+
   .aviso {
     background: #2a1215; border: 1px solid #7f1d1d; color: #fecaca;
     border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.5; margin-bottom: 20px;
@@ -52,58 +67,99 @@
   label.chk { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--muted); line-height: 1.5; margin: 10px 0; cursor: pointer; }
   label.chk input { width: auto; margin-top: 3px; }
   .vazio { color: var(--muted); text-align: center; padding: 40px 0; }
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--line); padding: 10px 18px; border-radius: 10px; font-size: 14px; display: none; max-width: 90vw; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--line); padding: 10px 18px; border-radius: 10px; font-size: 14px; display: none; max-width: 90vw; z-index: 10; }
+
+  .feed-controles { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .feed-controles select { max-width: 260px; }
+  .feed-controles input { max-width: 320px; }
+  .feed { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 0; max-height: 480px; overflow-y: auto; }
+  .msg { padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .msg:last-child { border-bottom: 0; }
+  .msg .quem { color: var(--green); font-weight: 600; font-size: 13px; }
+  .msg.minha .quem { color: var(--blue); }
+  .msg .hora { color: var(--muted); font-size: 12px; float: right; }
+  .msg .texto { margin-top: 3px; color: var(--text); word-break: break-word; white-space: pre-wrap; }
+  .msg .texto.midia { color: var(--muted); font-style: italic; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>📱 Instâncias WhatsApp <small>Cada número com sua sessão própria e persistente</small></h1>
+    <h1>📡 WPP Monitor <small>Cada WhatsApp com sua instância própria, ligada e persistente</small></h1>
     <div class="token-box">
       <input id="token" type="password" placeholder="Token do painel" style="width:180px">
       <button class="sec" onclick="salvarToken()">Salvar</button>
     </div>
   </header>
 
-  <div class="aviso">
-    <strong>Aviso obrigatório:</strong> ao parear um número por QR, as conversas acessíveis pelo
-    WhatsApp Web podem ser baixadas para o ambiente local do bot. Só conecte números cujo dono
-    autorizou, com finalidade documentada. Gere o QR apenas quando o operador estiver pronto para escanear.
+  <div class="tabs">
+    <button class="tab ativa" data-pagina="monitor" onclick="mudarAba('monitor')">📡 WPP Monitor</button>
+    <button class="tab" data-pagina="config" onclick="mudarAba('config')">⚙️ Configurar</button>
   </div>
 
-  <div class="nova">
-    <h2>➕ Conectar novo WhatsApp</h2>
-    <div class="campos">
-      <input id="f-nome" placeholder="Nome da instância (ex: Loja Centro)">
-      <input id="f-dono" placeholder="Dono do número (ex: Lucas)">
-      <select id="f-finalidade">
-        <option value="vendas">Vendas</option>
-        <option value="suporte">Suporte</option>
-        <option value="operacao">Operação</option>
-        <option value="pessoal">Pessoal</option>
-        <option value="outro">Outro</option>
-      </select>
+  <!-- ABA: WPP MONITOR -->
+  <div id="pag-monitor" class="pagina ativa">
+    <div class="stats">
+      <div class="stat"><b id="st-total">0</b><span>Instâncias</span></div>
+      <div class="stat"><b id="st-conectadas" style="color:var(--green)">0</b><span>Conectadas</span></div>
+      <div class="stat"><b id="st-qr" style="color:var(--yellow)">0</b><span>Aguardando QR</span></div>
+      <div class="stat"><b id="st-msgs">0</b><span>Msgs na sessão</span></div>
     </div>
-    <label class="chk">
-      <input type="checkbox" id="f-consent">
-      <span>Confirmo que o dono do número autoriza o pareamento e entende que o histórico
-      acessível pelo WhatsApp Web pode ser baixado para o ambiente local deste bot.</span>
-    </label>
-    <label class="chk">
-      <input type="checkbox" id="f-responder" checked>
-      <span>Responder mensagens automaticamente (bot da loja ativo neste número)</span>
-    </label>
-    <button onclick="criar()">Criar instância e gerar QR</button>
+
+    <div id="resumo" class="grid" style="margin-bottom:24px"></div>
+
+    <div class="feed-controles">
+      <select id="feed-inst"></select>
+      <input id="feed-busca" placeholder="Buscar no histórico (ex: corolla)">
+      <button class="sec" onclick="carregarFeed()">Buscar</button>
+    </div>
+    <div id="feed" class="feed"><div class="vazio">Selecione uma instância para ver as mensagens.</div></div>
   </div>
 
-  <div id="lista" class="grid"></div>
-  <div id="vazio" class="vazio" style="display:none">Nenhuma instância ainda. Conecte o primeiro WhatsApp acima. 🚀</div>
+  <!-- ABA: CONFIGURAR -->
+  <div id="pag-config" class="pagina">
+    <div class="aviso">
+      <strong>Aviso obrigatório:</strong> ao parear um número por QR, as conversas acessíveis pelo
+      WhatsApp Web podem ser baixadas para o ambiente local do bot. Só conecte números cujo dono
+      autorizou, com finalidade documentada. Gere o QR apenas quando o operador estiver pronto para escanear.
+    </div>
+
+    <div class="nova">
+      <h2>➕ Conectar novo WhatsApp</h2>
+      <div class="campos">
+        <input id="f-nome" placeholder="Nome da instância (ex: Loja Centro)">
+        <input id="f-dono" placeholder="Dono do número (ex: Lucas)">
+        <select id="f-finalidade">
+          <option value="vendas">Vendas</option>
+          <option value="suporte">Suporte</option>
+          <option value="operacao">Operação</option>
+          <option value="pessoal">Pessoal</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+      <label class="chk">
+        <input type="checkbox" id="f-consent">
+        <span>Confirmo que o dono do número autoriza o pareamento e entende que o histórico
+        acessível pelo WhatsApp Web pode ser baixado para o ambiente local deste bot.</span>
+      </label>
+      <label class="chk">
+        <input type="checkbox" id="f-responder" checked>
+        <span>Responder mensagens automaticamente (bot da loja ativo neste número)</span>
+      </label>
+      <button onclick="criar()">Criar instância e gerar QR</button>
+    </div>
+
+    <div id="lista" class="grid"></div>
+    <div id="vazio" class="vazio" style="display:none">Nenhuma instância ainda. Conecte o primeiro WhatsApp acima. 🚀</div>
+  </div>
 </div>
 <div id="toast" class="toast"></div>
 
 <script>
 const $ = (id) => document.getElementById(id)
 let carregando = false
+let abaAtual = 'monitor'
+let instancias = []
 
 function token() { try { return localStorage.getItem('panelToken') || '' } catch { return '' } }
 function salvarToken() {
@@ -131,6 +187,13 @@ async function api(caminho, opts = {}) {
   return body
 }
 
+function mudarAba(nome) {
+  abaAtual = nome
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('ativa', t.dataset.pagina === nome))
+  document.querySelectorAll('.pagina').forEach((p) => p.classList.toggle('ativa', p.id === 'pag-' + nome))
+  if (nome === 'monitor') carregarFeed()
+}
+
 const LABELS = {
   conectado: 'Conectado', aguardando_qr: 'Aguardando QR', conectando: 'Conectando',
   reconectando: 'Reconectando', parado: 'Parado', qr_expirado: 'QR expirado',
@@ -141,6 +204,57 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 }
 
+// ---------- Aba Monitor ----------
+function resumoHtml(i) {
+  return `<div class="card">
+    <h2>${esc(i.nome)} <span class="badge b-${esc(i.status)}">${LABELS[i.status] || esc(i.status)}</span></h2>
+    <div class="meta">
+      ${i.phone ? '📞 +' + esc(i.phone) + '<br>' : ''}
+      💬 ${i.msgCount || 0} msgs nesta sessão${i.lastMessageAt ? ' · última ' + new Date(i.lastMessageAt).toLocaleTimeString('pt-BR') : ''}
+    </div>
+  </div>`
+}
+
+function renderMonitor() {
+  $('st-total').textContent = instancias.length
+  $('st-conectadas').textContent = instancias.filter((i) => i.status === 'conectado').length
+  $('st-qr').textContent = instancias.filter((i) => i.status === 'aguardando_qr').length
+  $('st-msgs').textContent = instancias.reduce((s, i) => s + (i.msgCount || 0), 0)
+  $('resumo').innerHTML = instancias.length
+    ? instancias.map(resumoHtml).join('')
+    : '<div class="vazio">Nenhuma instância. Vá na aba ⚙️ Configurar para conectar o primeiro WhatsApp.</div>'
+
+  const sel = $('feed-inst')
+  const atual = sel.value
+  sel.innerHTML = ['<option value="">— instância do feed —</option>']
+    .concat(instancias.map((i) => `<option value="${esc(i.id)}">${esc(i.nome)}</option>`))
+    .join('')
+  if (instancias.some((i) => i.id === atual)) sel.value = atual
+  else if (!atual && instancias.length === 1) sel.value = instancias[0].id
+}
+
+async function carregarFeed() {
+  const id = $('feed-inst').value
+  if (!id) return
+  try {
+    const q = $('feed-busca').value.trim()
+    const { messages } = await api(`/api/instances/${id}/messages?limit=50${q ? '&q=' + encodeURIComponent(q) : ''}`)
+    if (!messages.length) {
+      $('feed').innerHTML = '<div class="vazio">Nenhuma mensagem ainda nesta instância.</div>'
+      return
+    }
+    $('feed').innerHTML = messages.map((m) => `
+      <div class="msg ${m.fromMe ? 'minha' : ''}">
+        <span class="hora">${new Date(m.ts).toLocaleString('pt-BR')}</span>
+        <span class="quem">${m.fromMe ? '➡️ Bot' : '⬅️ ' + esc(m.pushName || (m.from || '').split('@')[0])}</span>
+        <div class="texto ${m.text ? '' : 'midia'}">${m.text ? esc(m.text) : '[' + esc(m.type || 'mídia') + ']'}</div>
+      </div>`).join('')
+  } catch (err) {
+    toast(err.message)
+  }
+}
+
+// ---------- Aba Configurar ----------
 function cardHtml(i) {
   const podeConectar = ['parado', 'qr_expirado', 'desconectado_logout', 'erro'].includes(i.status)
   const ativo = ['conectado', 'aguardando_qr', 'conectando', 'reconectando'].includes(i.status)
@@ -174,6 +288,8 @@ async function atualizar() {
   carregando = true
   try {
     const { instances } = await api('/api/instances')
+    instancias = instances
+    renderMonitor()
     $('lista').innerHTML = instances.map(cardHtml).join('')
     $('vazio').style.display = instances.length ? 'none' : 'block'
   } catch (err) {
@@ -230,7 +346,10 @@ async function remover(id) {
 
 $('token').value = token()
 atualizar()
-setInterval(atualizar, 3000)
+setInterval(() => {
+  atualizar()
+  if (abaAtual === 'monitor' && $('feed-inst').value) carregarFeed()
+}, 3000)
 </script>
 </body>
 </html>

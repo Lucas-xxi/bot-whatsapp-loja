@@ -1,20 +1,13 @@
 {
   "name": "bot-whatsapp-loja",
   "version": "2.0.0",
-  "description": "Bot WhatsApp para loja usando Baileys — multi-instância com sessões persistentes",
-  "main": "index.js",
+  "description": "Bot WhatsApp para loja — o sistema inteiro vive no módulo wpp_monitor/",
+  "private": true,
   "scripts": {
-    "start": "node index.js"
+    "start": "node wpp_monitor/index.js",
+    "postinstall": "npm --prefix wpp_monitor install"
   },
   "engines": {
     "node": ">=18"
-  },
-  "dependencies": {
-    "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "^6.7.9",
-    "express": "^4.21.2",
-    "pino": "^9.6.0",
-    "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0"
   }
 }

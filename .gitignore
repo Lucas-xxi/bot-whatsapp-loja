@@ -1,5 +1,7 @@
 node_modules/
 data/
 auth_info/
+wpp_monitor/data/
+wpp_monitor/node_modules/
 *.log
 .env

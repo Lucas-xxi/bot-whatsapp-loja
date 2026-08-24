@@ -15,8 +15,9 @@ const MessageStore = require('./store')
 const { handleMessage, extractText } = require('./botHandler')
 
 // Tudo que é sensível (sessões, histórico, registro de perfis) fica em DATA_DIR,
-// fora do Git. Em produção, monte um volume neste caminho para persistir.
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data')
+// fora do Git. O padrão é a pasta data/ DENTRO do módulo wpp_monitor, para que
+// copiar a pasta leve junto as sessões. Em produção, monte um volume aqui.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data')
 
 // Depois de N ciclos de QR sem ninguém escanear, a instância para de gerar QR
 // (QR antigo deve ser descartado; o operador reconecta pelo painel quando estiver pronto).
