@@ -157,6 +157,8 @@
 
 <script>
 const $ = (id) => document.getElementById(id)
+// Base da URL: permite montar o painel numa rota de outro sistema (ex: /wpp-monitor).
+const BASE = location.pathname.replace(/\/+$/, '')
 let carregando = false
 let abaAtual = 'monitor'
 let instancias = []
@@ -181,7 +183,7 @@ function toast(msg) {
   el._t = setTimeout(() => (el.style.display = 'none'), 4000)
 }
 async function api(caminho, opts = {}) {
-  const res = await fetch(caminho, { headers: headers(), ...opts })
+  const res = await fetch(BASE + caminho, { headers: headers(), ...opts })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body.erro || ('Erro ' + res.status))
   return body
