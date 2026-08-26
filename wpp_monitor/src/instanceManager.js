@@ -24,6 +24,10 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data')
 const MAX_CICLOS_QR = 3
 const RECONNECT_MAX_MS = 30_000
 
+// MODO_MONITOR=1: o foco é leitura de dados (monitor), então novas instâncias
+// nascem com resposta automática DESLIGADA, a menos que se peça o contrário.
+const MODO_MONITOR = process.env.MODO_MONITOR === '1'
+
 const logger = pino({ level: process.env.BAILEYS_LOG_LEVEL || 'silent' })
 
 class ApiError extends Error {
@@ -174,7 +178,9 @@ class InstanceManager {
             consentimentoEm: agora,
             criadoEm: agora,
             autoStart: input.autoStart !== false,
-            responderAutomatico: input.responderAutomatico !== false,
+            responderAutomatico: MODO_MONITOR
+                ? input.responderAutomatico === true
+                : input.responderAutomatico !== false,
             ignorarGrupos: input.ignorarGrupos !== false,
             phone: null,
             observacoes: String(input.observacoes || '').trim(),
@@ -267,6 +273,46 @@ class InstanceManager {
     searchMessages(id, opts) {
         this._getProfile(id)
         return this._getRuntime(id).store.search(opts)
+    }
+
+    // Métricas de disparo/recebimento por instância + totais somados.
+    // Consumido pelo painel e pelo Optimus (rota /api/metrics).
+    stats({ dia } = {}) {
+        const instancias = this.profiles.map((profile) => {
+            const rt = this._getRuntime(profile.id)
+            return {
+                id: profile.id,
+                nome: profile.nome,
+                phone: profile.phone || rt.phone,
+                status: rt.status,
+                ...rt.store.stats({ dia }),
+            }
+        })
+
+        const total = {
+            dia: instancias[0]?.dia || new Date().toLocaleDateString('sv-SE'),
+            disparos: 0,
+            recebidas: 0,
+            totalDia: 0,
+            contatosDia: 0,
+            contatosDisparadosDia: 0,
+            disparos24h: 0,
+            recebidas24h: 0,
+            totalGeral: 0,
+            porHora: Array.from({ length: 24 }, () => ({ disparos: 0, recebidas: 0 })),
+            instanciasConectadas: instancias.filter((i) => i.status === 'conectado').length,
+            instancias: instancias.length,
+        }
+        for (const i of instancias) {
+            for (const k of ['disparos', 'recebidas', 'totalDia', 'contatosDia', 'contatosDisparadosDia', 'disparos24h', 'recebidas24h', 'totalGeral']) {
+                total[k] += i[k] || 0
+            }
+            i.porHora.forEach((h, idx) => {
+                total.porHora[idx].disparos += h.disparos
+                total.porHora[idx].recebidas += h.recebidas
+            })
+        }
+        return { total, instancias }
     }
 
     async sendText(id, numero, texto) {
@@ -467,4 +513,4 @@ class InstanceManager {
     }
 }
 
-module.exports = { InstanceManager, ApiError, DATA_DIR }
+module.exports = { InstanceManager, ApiError, DATA_DIR, MODO_MONITOR }

@@ -80,6 +80,18 @@
   .msg .hora { color: var(--muted); font-size: 12px; float: right; }
   .msg .texto { margin-top: 3px; color: var(--text); word-break: break-word; white-space: pre-wrap; }
   .msg .texto.midia { color: var(--muted); font-style: italic; }
+
+  .dia-barra { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; }
+  .dia-barra label { color: var(--muted); font-size: 13px; }
+  .dia-barra input { max-width: 180px; }
+  .leg { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; }
+  .grafico { display: flex; align-items: flex-end; gap: 3px; height: 130px; overflow-x: auto; }
+  .hora { flex: 1 0 22px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .barras { display: flex; align-items: flex-end; gap: 2px; height: 100px; }
+  .barra { width: 7px; border-radius: 2px 2px 0 0; min-height: 2px; }
+  .barra.d { background: var(--blue); }
+  .barra.r { background: var(--green); }
+  .hora span { font-size: 10px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -99,11 +111,28 @@
 
   <!-- ABA: WPP MONITOR -->
   <div id="pag-monitor" class="pagina ativa">
+    <div class="dia-barra">
+      <label for="m-dia">📅 Dia</label>
+      <input type="date" id="m-dia" onchange="carregarMetricas()">
+      <button class="sec" onclick="irHoje()">Hoje</button>
+    </div>
+
     <div class="stats">
-      <div class="stat"><b id="st-total">0</b><span>Instâncias</span></div>
-      <div class="stat"><b id="st-conectadas" style="color:var(--green)">0</b><span>Conectadas</span></div>
+      <div class="stat"><b id="st-disparos" style="color:var(--blue)">0</b><span>➡️ Disparos do dia</span></div>
+      <div class="stat"><b id="st-recebidas" style="color:var(--green)">0</b><span>⬅️ Recebidas do dia</span></div>
+      <div class="stat"><b id="st-contatos">0</b><span>Contatos que responderam</span></div>
+      <div class="stat"><b id="st-alcancados">0</b><span>Contatos disparados</span></div>
+      <div class="stat"><b id="st-conectadas" style="color:var(--green)">0</b><span>Instâncias conectadas</span></div>
       <div class="stat"><b id="st-qr" style="color:var(--yellow)">0</b><span>Aguardando QR</span></div>
-      <div class="stat"><b id="st-msgs">0</b><span>Msgs na sessão</span></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <h2 style="font-size:15px;margin-bottom:4px">Movimento por hora</h2>
+      <div class="meta" style="margin:0 0 10px">
+        <span class="leg" style="background:var(--blue)"></span> disparos
+        <span class="leg" style="background:var(--green);margin-left:12px"></span> recebidas
+      </div>
+      <div id="grafico" class="grafico"></div>
     </div>
 
     <div id="resumo" class="grid" style="margin-bottom:24px"></div>
@@ -193,7 +222,7 @@ function mudarAba(nome) {
   abaAtual = nome
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('ativa', t.dataset.pagina === nome))
   document.querySelectorAll('.pagina').forEach((p) => p.classList.toggle('ativa', p.id === 'pag-' + nome))
-  if (nome === 'monitor') carregarFeed()
+  if (nome === 'monitor') { carregarMetricas(); carregarFeed() }
 }
 
 const LABELS = {
@@ -207,24 +236,60 @@ function esc(s) {
 }
 
 // ---------- Aba Monitor ----------
+let metricas = { total: null, instancias: [] }
+
+function hojeISO() { return new Date().toLocaleDateString('sv-SE') }
+function irHoje() { $('m-dia').value = hojeISO(); carregarMetricas() }
+
+async function carregarMetricas() {
+  try {
+    const dia = $('m-dia').value || hojeISO()
+    metricas = await api(`/api/metrics?dia=${encodeURIComponent(dia)}`)
+    renderMetricas()
+  } catch (err) {
+    toast(err.message)
+  }
+}
+
+function renderMetricas() {
+  const t = metricas.total
+  if (!t) return
+  $('st-disparos').textContent = t.disparos
+  $('st-recebidas').textContent = t.recebidas
+  $('st-contatos').textContent = t.contatosDia
+  $('st-alcancados').textContent = t.contatosDisparadosDia
+
+  const pico = Math.max(1, ...t.porHora.map((h) => Math.max(h.disparos, h.recebidas)))
+  $('grafico').innerHTML = t.porHora.map((h, i) => `
+    <div class="hora" title="${String(i).padStart(2, '0')}h — ${h.disparos} disparos, ${h.recebidas} recebidas">
+      <div class="barras">
+        <div class="barra d" style="height:${(h.disparos / pico) * 100}%"></div>
+        <div class="barra r" style="height:${(h.recebidas / pico) * 100}%"></div>
+      </div>
+      <span>${String(i).padStart(2, '0')}</span>
+    </div>`).join('')
+
+  $('resumo').innerHTML = metricas.instancias.length
+    ? metricas.instancias.map(resumoHtml).join('')
+    : '<div class="vazio">Nenhuma instância. Vá na aba ⚙️ Configurar para conectar o primeiro WhatsApp.</div>'
+}
+
 function resumoHtml(i) {
   return `<div class="card">
     <h2>${esc(i.nome)} <span class="badge b-${esc(i.status)}">${LABELS[i.status] || esc(i.status)}</span></h2>
     <div class="meta">
       ${i.phone ? '📞 +' + esc(i.phone) + '<br>' : ''}
-      💬 ${i.msgCount || 0} msgs nesta sessão${i.lastMessageAt ? ' · última ' + new Date(i.lastMessageAt).toLocaleTimeString('pt-BR') : ''}
+      ➡️ <b style="color:var(--blue)">${i.disparos}</b> disparos ·
+      ⬅️ <b style="color:var(--green)">${i.recebidas}</b> recebidas<br>
+      👥 ${i.contatosDia} responderam · 📨 ${i.contatosDisparadosDia} disparados<br>
+      🕐 24h: ${i.disparos24h} enviadas / ${i.recebidas24h} recebidas · 🗂️ ${i.totalGeral} no total
     </div>
   </div>`
 }
 
 function renderMonitor() {
-  $('st-total').textContent = instancias.length
   $('st-conectadas').textContent = instancias.filter((i) => i.status === 'conectado').length
   $('st-qr').textContent = instancias.filter((i) => i.status === 'aguardando_qr').length
-  $('st-msgs').textContent = instancias.reduce((s, i) => s + (i.msgCount || 0), 0)
-  $('resumo').innerHTML = instancias.length
-    ? instancias.map(resumoHtml).join('')
-    : '<div class="vazio">Nenhuma instância. Vá na aba ⚙️ Configurar para conectar o primeiro WhatsApp.</div>'
 
   const sel = $('feed-inst')
   const atual = sel.value
@@ -347,10 +412,15 @@ async function remover(id) {
 }
 
 $('token').value = token()
+$('m-dia').value = hojeISO()
 atualizar()
+carregarMetricas()
 setInterval(() => {
   atualizar()
-  if (abaAtual === 'monitor' && $('feed-inst').value) carregarFeed()
+  if (abaAtual === 'monitor') {
+    carregarMetricas()
+    if ($('feed-inst').value) carregarFeed()
+  }
 }, 3000)
 </script>
 </body>

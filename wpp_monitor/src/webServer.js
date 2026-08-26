@@ -34,6 +34,12 @@ function createApp(manager) {
         res.json({ instances: manager.list(), envioHabilitado: PERMITIR_ENVIO })
     })
 
+    // Métricas do dia: disparos (enviadas) x mensagens recebidas, por instância
+    // e somadas. Use ?dia=YYYY-MM-DD para outro dia. É o que o Optimus consome.
+    app.get('/api/metrics', (req, res) => {
+        res.json(manager.stats({ dia: req.query.dia }))
+    })
+
     app.post(
         '/api/instances',
         asyncHandler(async (req, res) => {
