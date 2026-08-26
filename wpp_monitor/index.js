@@ -22,6 +22,19 @@ async function start({ port } = {}) {
             console.log('👉 Nenhuma instância ainda. Abra o painel e conecte o primeiro WhatsApp.')
         }
     })
+
+    // Porta ocupada = já tem um WPP Monitor de pé. Saímos com código 3 para o
+    // .bat supervisor reconhecer e NÃO ficar reiniciando num laço sem fim.
+    server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.error(`⚠️  A porta ${p} já está em uso — o WPP Monitor provavelmente já está rodando.`)
+            if (require.main === module) process.exit(3)
+            return
+        }
+        console.error('Erro no servidor:', err)
+        if (require.main === module) process.exit(1)
+    })
+
     return { manager, app, server }
 }
 
