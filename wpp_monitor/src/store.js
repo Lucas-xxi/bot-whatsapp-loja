@@ -7,13 +7,39 @@ class MessageStore {
         this.dir = dir
         this.file = path.join(dir, 'messages.jsonl')
         fs.mkdirSync(dir, { recursive: true })
+        // Ids já gravados. Sem isto, a mesma mensagem entrava duas vezes (uma
+        // pela sincronização de histórico, outra ao vivo) e inflava a contagem.
+        this.ids = new Set()
+        this._carregarIds()
     }
 
+    _carregarIds() {
+        if (!fs.existsSync(this.file)) return
+        try {
+            for (const linha of fs.readFileSync(this.file, 'utf8').split('\n')) {
+                if (!linha) continue
+                try {
+                    const e = JSON.parse(linha)
+                    if (e.id) this.ids.add(e.id)
+                } catch {}
+            }
+        } catch (err) {
+            console.error('Erro ao ler histórico:', err.message)
+        }
+    }
+
+    // Devolve true se gravou; false se era repetida.
     append(entry) {
+        if (entry.id) {
+            if (this.ids.has(entry.id)) return false
+            this.ids.add(entry.id)
+        }
         try {
             fs.appendFileSync(this.file, JSON.stringify(entry) + '\n')
+            return true
         } catch (err) {
             console.error('Erro ao gravar histórico:', err.message)
+            return false
         }
     }
 
@@ -110,7 +136,10 @@ class MessageStore {
             } catch {
                 continue
             }
-            if (since && entry.ts < since) break
+            // continue (e não break): com histórico importado o arquivo não
+            // está em ordem cronológica, então parar na primeira antiga perderia
+            // mensagens boas mais adiante.
+            if (since && entry.ts < since) continue
             if (until && entry.ts > until) continue
             if (term) {
                 const alvo = `${entry.text || ''} ${entry.pushName || ''} ${entry.from || ''}`.toLowerCase()

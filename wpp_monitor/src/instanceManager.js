@@ -364,7 +364,10 @@ class InstanceManager {
             },
             logger,
             browser: Browsers.ubuntu('Chrome'),
-            syncFullHistory: false,
+            // Puxa o histórico ao parear. Mesmo em false o WhatsApp manda as
+            // conversas recentes por messaging-history.set; WPP_SYNC_HISTORY=1
+            // pede tudo o que o aparelho tiver (mais lento e mais pesado).
+            syncFullHistory: process.env.WPP_SYNC_HISTORY === '1',
             generateHighQualityLinkPreview: false,
         })
         rt.sock = sock
@@ -480,27 +483,59 @@ class InstanceManager {
             }
         })
 
+        // Grava UMA mensagem no histórico. Devolve true se era inédita.
+        // O horário vem do carimbo da própria mensagem (messageTimestamp), não
+        // do relógio de agora: sem isso, o histórico importado no pareamento
+        // cairia todo no dia de hoje e as métricas do dia sairiam erradas.
+        const gravar = (msg) => {
+            if (!msg?.message || !msg.key) return false
+            const from = msg.key.remoteJid
+            if (!from) return false
+            const carimbo = Number(msg.messageTimestamp?.low ?? msg.messageTimestamp ?? 0)
+            const ts = carimbo > 0 ? carimbo * 1000 : Date.now()
+            const inedita = rt.store.append({
+                id: msg.key.id || null,
+                ts,
+                iso: new Date(ts).toISOString(),
+                from,
+                fromMe: !!msg.key.fromMe,
+                pushName: msg.pushName || null,
+                type: Object.keys(msg.message)[0],
+                text: extractText(msg),
+            })
+            if (inedita) {
+                rt.msgCount += 1
+                if (!rt.lastMessageAt || ts > new Date(rt.lastMessageAt).getTime()) {
+                    rt.lastMessageAt = new Date(ts).toISOString()
+                }
+            }
+            return inedita
+        }
+
+        // Histórico que o WhatsApp manda logo após o pareamento. É o que faz o
+        // painel já nascer com os disparos e respostas de antes da conexão.
+        sock.ev.on('messaging-history.set', ({ messages }) => {
+            if (rt.sock !== sockRef) return
+            let n = 0
+            for (const msg of messages || []) if (gravar(msg)) n += 1
+            if (n) console.log(`📥 [${profile.id}] ${n} mensagens do histórico importadas.`)
+        })
+
         sock.ev.on('messages.upsert', async ({ messages, type }) => {
             if (rt.sock !== sockRef) return
-            if (type !== 'notify') return
+            // TODOS os tipos são gravados. As mensagens que VOCÊ envia pelo
+            // celular chegam como 'append' — filtrar só 'notify' zerava a
+            // contagem de disparos, que é justamente a métrica principal.
             for (const msg of messages) {
-                if (!msg.message) continue
+                const inedita = gravar(msg)
+
+                // Responder é outra história: só em mensagem nova de verdade
+                // ('notify'), nunca em histórico ou em algo já visto — senão o
+                // bot responderia conversas velhas ao reconectar.
+                if (type !== 'notify' || !inedita) continue
+                if (msg.key.fromMe) continue
                 const from = msg.key.remoteJid
                 const isGroup = typeof from === 'string' && from.endsWith('@g.us')
-                const entry = {
-                    ts: Date.now(),
-                    iso: new Date().toISOString(),
-                    from,
-                    fromMe: !!msg.key.fromMe,
-                    pushName: msg.pushName || null,
-                    type: Object.keys(msg.message)[0],
-                    text: extractText(msg),
-                }
-                rt.store.append(entry)
-                rt.msgCount += 1
-                rt.lastMessageAt = entry.iso
-
-                if (msg.key.fromMe) continue
                 if (isGroup && profile.ignorarGrupos !== false) continue
                 if (profile.responderAutomatico === false) continue
                 try {
